@@ -9,7 +9,7 @@ Produces three files under ./data/ :
 Usage
 -----
   # initial download (slow: ~500 API calls, expect 10-30 min)
-  python download_data.py --start 20250101 --end 20260421
+  python download_data.py --start 20200101 --end 20260421
 
   # incremental update: resume from max date already in prices.parquet
   python download_data.py --update --end 20260430
@@ -95,10 +95,10 @@ def fetch_index_hist(start: str, end: str) -> pd.DataFrame:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--start", default="20250101", help="YYYYMMDD (ignored if --update)")
+    p.add_argument("--start", default="20200101", help="YYYYMMDD (ignored if --update)")
     p.add_argument("--end", default=pd.Timestamp.today().strftime("%Y%m%d"))
     p.add_argument("--update", action="store_true", help="incremental from max date in existing prices.parquet")
-    p.add_argument("--sleep", type=float, default=0.1, help="seconds between stock requests")
+    p.add_argument("--sleep", type=float, default=0.2, help="seconds between stock requests")
     args = p.parse_args()
 
     DATA_DIR.mkdir(exist_ok=True)
