@@ -1,156 +1,230 @@
-# 📈 CSI500 Multi-Model Ensemble Stock Selection System
+# README — CSI 500 Stock Selection Pipeline
 
-![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
-An advanced quantitative stock-selection engine for the **CSI500 Index**, utilizing an optimized machine learning ensemble and industry-neutralized alpha signals. This model achieves a robust **Rank IC of ~0.0788** in recent validation.
+A machine-learning pipeline that ranks CSI 500 (中证500) constituents and constructs a top-30 portfolio for a 5-trading-day forward horizon. This README explains how to install dependencies and rerun the entire pipeline end-to-end.
 
 ---
 
-## 核心原理 | Core Principles
+## 1. Project Overview
 
-### 1. 组合集成算法 (Ensemble Architecture)
-The system employs a weighted voting mechanism across three state-of-the-art Gradient Boosting Machine (GBM) algorithms:
-* **LightGBM (50% weight)**: Optimized for leaf-wise growth and high-dimensional ranking tasks.
-* **XGBoost (30% weight)**: Provides strong regularization to prevent over-fitting on price noise.
-* **CatBoost (20% weight)**: Specifically handles categorical data like Industry Classifications with superior stability.
-
-### 2. 三段式时间切分 (Triple-Segment Training)
-To ensure the model remains "market-aware" while maintaining statistical integrity, we use a unique chronological split:
-* **Historical Base**: Long-term learning from 2020 onwards.
-* **The Embargo Gap**: A 20-day "buffer zone" to eliminate serial correlation between training and validation.
-* **Recent Patch**: Injecting the **latest 20 days** of market data directly into training to capture the most recent capital flow trends.
+The pipeline ingests Chinese A-share market data, builds 21 engineered features (price/volume technicals, cross-sectional ranks, industry-neutral alpha), trains a three-model ensemble (XGBoost + LightGBM + CatBoost) with a cross-sectional rank target, blends predictions with adaptive Rank-IC² weights, and outputs a 30-stock portfolio CSV. The latest run achieved a held-out validation Rank IC of 0.1213.
 
 ---
 
-## 特征工程 | Feature Engineering
+## 2. Repository Layout
 
-The model transforms raw market data into high-alpha features:
-
-| Category | Key Features | Logic |
-| :--- | :--- | :--- |
-| **Liquidity** | `volume_z_20d`, `turnover_ma_20d` | Identifies abnormal capital accumulation. |
-| **Neutralization**| `ind_ret_rank` | **Industry-neutralized alpha**: Cross-sectional ranking within specific sectors. |
-| **Momentum** | `ret_5d`, `ret_20d` | Captures trend strength across different time horizons. |
-| **Structure** | `skew_20d`, `pv_corr_10d` | Measures the health of the price-volume relationship. |
+```
+.
+├── data/                    # Created on first run; not checked in
+│   ├── prices.parquet              # OHLCV data
+│   ├── index.parquet               # CSI 500 benchmark
+│   ├── constituents.csv            # CSI 500 member list
+│   └── industry_mapping.csv        # Industry tags
+├── download_data.py         # Fetches prices, index, constituents from akshare
+├── get_industry.py          # Fetches industry mapping from Tushare Pro
+├── features.py              # Builds 21 features and the target
+├── baseline_ensembled.py    # Main training & inference pipeline
+├── score_submission.py      # Out-of-sample portfolio scoring
+├── submission.csv           # Final 30-stock portfolio (output)
+├── requirements.txt         # Python dependencies
+└── README.md
+```
 
 ---
 
-## 项目亮点 | Key Highlights
+## 3. Prerequisites
 
-* **Alpha Purity**: Industry ranking logic removes sector-wide "Beta" noise, focusing on true stock-specific outperformance.
-* **Dynamic Adaptation**: The "Recent Patch" logic allows the model to pivot quickly during fast sector rotations.
-* **Risk Mitigation**: Integrated weight capping (`MAX_WEIGHT = 0.045`) to ensure a diversified 30-stock portfolio.
-* **High Performance**: Validated **Rank IC of 0.0788** - significantly outperforming standard baseline metrics.
-
----
-
-## 运行指南 | Getting Started
-
-### 1. 环境准备 (Prerequisites)
-Ensure you have the required libraries installed:
-```bash
-pip install pandas numpy xgboost lightgbm catboost akshare tqdm scipy matplotlib pyarrow
-```
-### 2. 数据获取 (Data Acquisition)
-Fetch the full history of the CSI500 universe:
-```bash
-# Initial full download
-python download_data.py --start 20200101
-```
-### 3. 每日增量更新 (Daily Update)
-Crucial: Run this every morning before trading to sync the latest market snapshots:
-```bash
-python download_data.py --update
-```
-### 4. 模型预测 (Training & Prediction)
-Execute the ensemble pipeline to generate your top 30 stock picks:
-```bash
-python "baseline ensembled.py"
-```
-The results will be saved to submission.csv, featuring the stock_code and optimized weight.
-
-## 完全理解，我的错。这种断断续续的粘贴确实让人火大。
-
-这里是整份 README.md 的终极完整版。请全选、删除、粘贴这一个框里的所有内容。我已经在每个代码块（bash）的开头和结尾做了严格检查，保证不会再出现“灰色字体”或“格式断层”的问题。
-
-Markdown
-# 📈 CSI500 Multi-Model Ensemble Stock Selection System
-
-![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
-
-An advanced quantitative stock-selection engine for the **CSI500 Index**, utilizing an optimized machine learning ensemble and industry-neutralized alpha signals. This model achieves a robust **Rank IC of ~0.0788** in recent validation.
+- **Python**: 3.10 or 3.11 (3.12 has not been tested with all dependencies)
+- **Operating system**: Windows 10/11, macOS, or Linux
+- **RAM**: 8 GB minimum, 16 GB recommended (the panel after feature construction is roughly 2 million rows)
+- **Disk**: ~500 MB for cached data and model artifacts
+- **Internet access**: required only for the data-download step
+- **Tushare Pro account**: free registration at [tushare.pro](https://tushare.pro), needed for the industry mapping step
 
 ---
 
-## 核心原理 | Core Principles
+## 4. Installation
 
-### 1. 组合集成算法 (Ensemble Architecture)
-The system employs a weighted voting mechanism across three state-of-the-art Gradient Boosting Machine (GBM) algorithms:
-* **LightGBM (50% weight)**: Optimized for leaf-wise growth and high-dimensional ranking tasks.
-* **XGBoost (30% weight)**: Provides strong regularization to prevent over-fitting on price noise.
-* **CatBoost (20% weight)**: Specifically handles categorical data like Industry Classifications.
+### 4.1 Clone or download the repository
 
-### 2. 三段式时间切分 (Triple-Segment Training)
-To ensure the model remains "market-aware" while maintaining statistical integrity, we use a unique chronological split:
-* **Historical Base**: Long-term learning from 2020 onwards.
-* **The Embargo Gap**: A 20-day "buffer zone" to eliminate serial correlation.
-* **Recent Patch**: Injecting the **latest 20 days** of market data directly into training.
+```bash
+cd path/to/your/workspace
+# place all .py files here
+```
+
+### 4.2 Create and activate a virtual environment
+
+On Windows (PowerShell):
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+On macOS / Linux:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+### 4.3 Install dependencies
+
+If `requirements.txt` is present:
+
+```bash
+pip install -r requirements.txt
+```
+
+If you are starting from a clean repository, install the dependencies directly:
+
+```bash
+pip install pandas numpy scipy pyarrow scikit-learn \
+            xgboost lightgbm catboost \
+            akshare tushare \
+            matplotlib tqdm
+```
+
+### 4.4 Configure the Tushare token
+
+Open `get_industry.py` and replace the placeholder token at the top of the file with your own Tushare Pro token:
+
+```python
+MY_TOKEN = 'your_tushare_pro_token_here'
+```
+
+You can find your token after logging into [tushare.pro](https://tushare.pro) under "个人中心 → 接口TOKEN".
+
+If you do not want to embed the token in source, set an environment variable instead and modify `get_industry.py` to read `os.environ["TUSHARE_TOKEN"]`.
 
 ---
 
-## 特征工程 | Feature Engineering
+## 5. Running the Pipeline End-to-End
 
-| Category | Key Features | Logic |
-| :--- | :--- | :--- |
-| **Liquidity** | `volume_z_20d`, `turnover_ma_20d` | Identifies abnormal capital accumulation. |
-| **Neutralization**| `ind_ret_rank` | **Industry-neutralized alpha**: Ranking within specific sectors. |
-| **Momentum** | `ret_5d`, `ret_20d` | Captures trend strength across different time horizons. |
-| **Structure** | `skew_20d`, `pv_corr_10d` | Measures the health of the price-volume relationship. |
+The pipeline runs in four sequential stages. Each stage produces an artifact that the next stage consumes, so they must be run in order on a fresh checkout. Subsequent runs can skip stages 1 and 2 unless you want to refresh the data.
+
+### Stage 1 — Download price and constituent data
+
+```bash
+python download_data.py
+```
+
+This fetches the CSI 500 constituent list, the index benchmark, and forward-adjusted (qfq) OHLCV data for every constituent from 2020-01-01 through the latest available trading day, saving them to `data/prices.parquet`, `data/index.parquet`, and `data/constituents.csv`. Expected runtime: roughly 15 to 30 minutes for the first run, depending on network conditions and akshare's rate limits. Subsequent runs are incremental and faster.
+
+### Stage 2 — Download industry mapping
+
+```bash
+python get_industry.py
+```
+
+This fetches the full A-share basic information from Tushare Pro, joins it onto the CSI 500 constituents, and writes `data/industry_mapping.csv`. Expected runtime: under one minute. Required only once unless industry classifications need refreshing.
+
+### Stage 3 — Train the model and generate the portfolio
+
+```bash
+python baseline_ensembled.py
+```
+
+This is the main pipeline and performs the following steps internally:
+
+1. Loads `data/prices.parquet` and joins industry tags from `data/industry_mapping.csv`
+2. Builds 21 features via `features.build_features`
+3. Splits the panel into historical train, recent train patch, and validation segments using double-sided embargoes
+4. Converts the target to per-day cross-sectional percentile rank
+5. Trains XGBoost, LightGBM, and CatBoost with time-decay sample weights
+6. Computes adaptive ensemble weights from each model's validation Rank IC²
+7. Blends predictions via cross-sectional z-score before weighted averaging
+8. Constructs a top-30 portfolio with rank-based weights, capped at 4.5% per name
+9. Writes the result to `submission.csv` and displays a feature-importance plot
+
+Expected runtime: 8 to 20 minutes depending on hardware. Memory usage peaks around 4 to 6 GB.
+
+#### Optional command-line flags
+
+```bash
+python baseline_ensembled.py \
+    --prices data/prices.parquet \
+    --as-of 2026-04-30 \
+    --top-k 30 \
+    --out submission.csv
+```
+
+- `--prices`: path to the prices parquet (defaults to `data/prices.parquet`)
+- `--as-of`: prediction date in `YYYY-MM-DD` format (defaults to the latest available trading day)
+- `--top-k`: number of stocks in the portfolio (default 30)
+- `--out`: output filename (default `submission.csv`)
+
+### Stage 4 — Score the submission (optional)
+
+If you want to evaluate a generated portfolio against the realized future return:
+
+```bash
+python score_submission.py --submission submission.csv
+```
+
+This computes the portfolio's realized return over the forward window and compares it to the CSI 500 benchmark.
 
 ---
 
-## 项目亮点 | Key Highlights
+## 6. Expected Output
 
-* **Alpha Purity**: Industry ranking logic removes sector-wide "Beta" noise.
-* **Dynamic Adaptation**: The "Recent Patch" logic pivots quickly during sector rotations.
-* **Risk Mitigation**: Integrated weight capping (`MAX_WEIGHT = 0.045`) for diversification.
-* **High Performance**: Validated **Rank IC of 0.0788**.
+A successful run of stage 3 produces console output similar to:
+
+```
+>> Loading data/prices.parquet
+>> Building features
+   [Train] Historical until 2026-01-07 + recent patch 2026-03-30 ~ 2026-04-27
+   [Valid] 2026-01-15 ~ 2026-03-19 (post-val embargo = 7 days, pre-val embargo = 5 days)
+   Rows - Train: 682,808, Val: 19,912
+>> Training Ensemble (XGB + LGB + CAT)
+   Training XGBoost (Rank Regression)...
+   Training LightGBM (Rank Regression)...
+   Training CatBoost (Rank Regression)...
+>> Computing adaptive ensemble weights (validation Rank IC²)
+   Validation Rank IC -> LGB: 0.1167 | XGB: 0.1200 | CAT: 0.1206
+   Adaptive weights    -> LGB: 0.320 | XGB: 0.338 | CAT: 0.342
+   Ensemble validation rank IC: 0.1213
+>> Predicting portfolio
+>> Wrote 30 names to submission.csv
+```
+
+The final `submission.csv` contains two columns, `stock_code` and `weight`, with 30 rows summing to 1.0.
 
 ---
 
-## 运行指南 | Getting Started
+## 7. Reproducibility Notes
 
-### 1. 环境准备 (Prerequisites)
-Ensure you have the required libraries installed:
+- All three boosters are seeded internally; results across runs are deterministic up to small floating-point variation
+- Re-running stage 1 fetches incremental price updates only; stages 2, 3, and 4 produce reproducible outputs given fixed input data
+- The `--as-of` flag lets you reproduce the exact pipeline as of any historical date for backtesting purposes
+- The validation period and embargo lengths are constants defined at the top of `baseline_ensembled.py` (`VAL_DAYS`, `EMBARGO_DAYS`, `RECENT_PATCH_LEN`, `POST_VAL_EMBARGO`)
 
-```bash
-pip install pandas numpy xgboost lightgbm catboost akshare tqdm scipy matplotlib pyarrow
-```
-### 2. 数据获取 (Data Acquisition)
-Fetch the full history of the CSI500 universe:
+---
 
-```bash
-python download_data.py --start 20200101
-```
-### 3. 每日增量更新 (Daily Update)
-Crucial: Run this every morning before trading to sync the latest market snapshots:
+## 8. Troubleshooting
 
-```bash
-python download_data.py --update
-```
-### 4. 模型预测 (Training & Prediction)
-Execute the ensemble pipeline to generate your top 30 stock picks:
+**`ModuleNotFoundError: No module named 'akshare'`**
+You forgot to activate the virtual environment, or the dependency install failed. Re-run the install step from section 4.3.
 
-```bash
-python "baseline ensembled.py"
-```
-The results will be saved to submission.csv, featuring the stock_code and optimized weight.
+**`requests.exceptions.ConnectionError` during `download_data.py`**
+akshare's Sina backend occasionally rate-limits or temporarily refuses connections. Wait a few minutes and retry; the script resumes from the last successful stock.
 
-## 数据来源 | Data Sources
-Engine: akshare
+**`AssertionError: token not set` during `get_industry.py`**
+You did not configure your Tushare Pro token in section 4.4.
 
-Universe: CSI500 Index Constituents
+**`FileNotFoundError: data/prices.parquet` when running `baseline_ensembled.py`**
+You skipped stage 1. Run `python download_data.py` first.
 
-Features: Daily OHLCV data + Industry Classifications
+**`Warning: pe_ratio missing, padding with 0` and `Warning: pb_ratio missing, padding with 0`**
+The downloaded prices file does not include fundamental ratios. The pipeline pads them with zero and continues; this is harmless because the model does not currently use those columns. If you wish to enable them later, extend `download_data.py` to fetch fundamentals.
+
+**Model trains but validation Rank IC is negative**
+This usually indicates either a corrupted `industry_mapping.csv` (rerun stage 2) or a price-data issue spanning trading-halt periods. Check that the date ranges printed by the pipeline match expectations.
+
+**Out-of-memory during feature construction**
+Reduce the historical window in `download_data.py` from 2020-01-01 to a more recent start date, or run on a machine with at least 16 GB of RAM.
+
+---
+
+## 9. Citation and Credit
+
+Data is provided by [akshare](https://akshare.akfamily.xyz) and [Tushare Pro](https://tushare.pro). Modeling uses [XGBoost](https://xgboost.readthedocs.io), [LightGBM](https://lightgbm.readthedocs.io), and [CatBoost](https://catboost.ai). All other code in this repository was written for this project.
